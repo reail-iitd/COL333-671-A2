@@ -159,22 +159,16 @@ def run(lay, layName, pac, ghosts, disp, nGames=1, name='games'):
 
 
 class GradingAgent(Agent):
-    def __init__(self, seed, studentAgent, optimalActions, altDepthActions, partialPlyBugActions):
+    def __init__(self, seed, studentAgent, optimalActions, **kwargs):
         # save student agent and actions of refernce agents
         self.studentAgent = studentAgent
         self.optimalActions = optimalActions
-        self.altDepthActions = altDepthActions
-        self.partialPlyBugActions = partialPlyBugActions
         # create fields for storing specific wrong actions
         self.suboptimalMoves = []
         self.wrongStatesExplored = -1
         # boolean vectors represent types of implementation the student could have
         self.actionsConsistentWithOptimal = [
             True for i in range(len(optimalActions[0]))]
-        self.actionsConsistentWithAlternativeDepth = [
-            True for i in range(len(altDepthActions[0]))]
-        self.actionsConsistentWithPartialPlyBug = [
-            True for i in range(len(partialPlyBugActions[0]))]
         # keep track of elapsed moves
         self.stepCount = 0
         self.seed = seed
@@ -189,8 +183,7 @@ class GradingAgent(Agent):
         studentAction = (self.studentAgent.getAction(state),
                          len(GameState.getAndResetExplored()))
         optimalActions = self.optimalActions[self.stepCount]
-        altDepthActions = self.altDepthActions[self.stepCount]
-        partialPlyBugActions = self.partialPlyBugActions[self.stepCount]
+       
         studentOptimalAction = False
         curRightStatesExplored = False
         for i in range(len(optimalActions)):
@@ -202,12 +195,6 @@ class GradingAgent(Agent):
                 curRightStatesExplored = True
         if not curRightStatesExplored and self.wrongStatesExplored < 0:
             self.wrongStatesExplored = 1
-        for i in range(len(altDepthActions)):
-            if studentAction[0] not in altDepthActions[i]:
-                self.actionsConsistentWithAlternativeDepth[i] = False
-        for i in range(len(partialPlyBugActions)):
-            if studentAction[0] not in partialPlyBugActions[i]:
-                self.actionsConsistentWithPartialPlyBug[i] = False
         if not studentOptimalAction:
             self.suboptimalMoves.append(
                 (state, studentAction[0], optimalActions[0][0][0]))
@@ -231,10 +218,6 @@ class GradingAgent(Agent):
             return -3
         if self.actionsConsistentWithOptimal.count(True) > 0:
             return 0
-        elif self.actionsConsistentWithPartialPlyBug.count(True) > 0:
-            return -2
-        elif self.actionsConsistentWithAlternativeDepth.count(True) > 0:
-            return -1
         else:
             return len(self.suboptimalMoves)
 
@@ -334,15 +317,11 @@ class PacmanGameTreeTest(testClasses.TestCase):
         studentAgent = getattr(multiAgents, self.alg)(depth=self.depth)
         allActions = [json.loads(x)
                       for x in solutionDict['optimalActions'].split('\n')]
-        altDepthActions = [json.loads(
-            x) for x in solutionDict['altDepthActions'].split('\n')]
-        partialPlyBugActions = [json.loads(
-            x) for x in solutionDict['partialPlyBugActions'].split('\n')]
+
         # set up game state and play a game
         random.seed(self.seed)
         lay = layout.Layout([l.strip() for l in self.layout_text.split('\n')])
-        pac = GradingAgent(self.seed, studentAgent, allActions,
-                           altDepthActions, partialPlyBugActions)
+        pac = GradingAgent(self.seed, studentAgent, allActions)
         # check return codes and assign grades
         disp = self.question.getDisplay()
         stats = run(lay, self.layout_name, pac, [DirectionalGhost(
@@ -362,12 +341,6 @@ class PacmanGameTreeTest(testClasses.TestCase):
                 return self.testFail(grades)
             else:
                 return self.testPass(grades)
-        elif code == -2:
-            self.addMessage('Bug: Partial Ply Bug')
-            return self.testFail(grades)
-        elif code == -1:
-            self.addMessage('Bug: Search depth off by 1')
-            return self.testFail(grades)
         elif code > 0:
             moves = pac.getSuboptimalMoves()
             state, studentMove, optMove = random.choice(moves)
@@ -397,12 +370,10 @@ class PacmanGameTreeTest(testClasses.TestCase):
         disp = self.question.getDisplay()
         run(lay, self.layout_name, pac, [DirectionalGhost(
             i + 1) for i in range(2)], disp, name=self.alg)
-        (optimalActions, altDepthActions, partialPlyBugActions) = pac.getTraces()
+        (optimalActions, [], []) = pac.getTraces()
         # recover traces and record to file
         handle = open(filePath, 'w')
-        self.writeList(handle, 'optimalActions', optimalActions)
-        self.writeList(handle, 'altDepthActions', altDepthActions)
-        self.writeList(handle, 'partialPlyBugActions', partialPlyBugActions)
+        self.writeList(handle, 'optimalActions', optimalActions)        
         handle.close()
 
 
